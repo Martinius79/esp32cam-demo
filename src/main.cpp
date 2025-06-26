@@ -316,6 +316,14 @@ void setup() {
      Serial.print(SSID_NAME);
      Serial.print("\n   ");
    }
+   if (SSID_NAME == nullptr) {
+  if (serialDebug) Serial.println("Error: SSID_NAME not set!");
+  while(1); // Stop
+}
+if (SSID_PASWORD == nullptr) {
+  if (serialDebug) Serial.println("Error: SSID_PASWORD not set!");
+  while(1); // Stop
+}
    WiFi.begin(SSID_NAME, SSID_PASWORD);
    while (WiFi.status() != WL_CONNECTED) {
        delay(500);
@@ -614,6 +622,8 @@ bool cameraImageSettings(bool flush) {
   if (serialDebug) Serial.println("Applying camera settings");
 
    sensor_t *s = esp_camera_sensor_get();
+   // printf("Sensor ID: 0x%x\n", s->id.PID);  // print sensor id to serial port
+   if (serialDebug) Serial.printf("Sensor ID: 0x%x\n", s->id.PID);  // print sensor id to serial port
    // something to try?:     if (s->id.PID == OV3660_PID)
    if (s == NULL) {
      if (serialDebug) Serial.println("Error: problem reading camera sensor settings");
