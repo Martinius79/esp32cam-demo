@@ -50,6 +50,25 @@
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 #include "_USER_DEFINES.h"         // user settings (wifi, OTA, etc.)
 
+//   ---------------------------------------------------------------------------------------------------------
+// for standard ESP32-CAM AI Thinker board
+// #undef ESP32CAMFREENOVE
+// #undef ESP32CAMFREENOVE_S3
+// #define ESP32CAMAITHINKER 1
+
+// for Freenove ESP32-Wrover CAM Board - ESP32-CAM Dev Module 4MB Flash - 4MB PSRAM
+// #undef ESP32CAMAITHINKER
+// #undef ESP32CAMFREENOVE_S3
+// #define ESP32CAMFREENOVE 1
+
+// for Freenove ESP32-Wrover S3 Board - ESP32-S3-CAM Dev Module 16MB Flash - 8MB PSRAM
+// #undef ESP32CAMAITHINKER
+// #undef ESP32CAMFREENOVE
+// #define ESP32CAMFREENOVE_S3 1
+
+// for Chinese Seller ESP32-CAM board
+#define ESP32CAMCHINESESELLER 1
+
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -129,14 +148,17 @@
 
  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
-#ifndef ESP32CAMNORESETBEFORE
- const int indicatorLED = 33;                           // onboard small LED pin (33)
-#endif
- const bool flashIndicatorLED = 0;                      // if led is to flash to indicate camera is operating ok
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+//  const int indicatorLED = 33;                           // onboard small LED pin (33)
+// #else
+//  // for Freenove ESP32-WROVER and WROVER-S3 Board
+//  const int indicatorLED = 2;                        // onboard small LED pin (2) - not used in this sketch 
+// #endif
+ const bool flashIndicatorLED = 1;                      // use On-Board LED for flashing, to indicate camera is operating
  
 
  // Bright LED (Flash)
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
   const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
 #endif
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
@@ -144,7 +166,7 @@
    const int ledChannel = 15;                           // camera uses timer1
    const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
 
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
  const int iopinA = 13;                                 // general io pin 13
  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
 #endif
@@ -154,65 +176,99 @@
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 // see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
 // set camera resolution etc. in 'initialiseCamera()' and 'cameraImageSettings()'
- #define CAMERA_MODEL_AI_THINKER
- #define PWDN_GPIO_NUM     32      // power to camera (on/off)
- #define RESET_GPIO_NUM    -1      // -1 = not used
- #define XCLK_GPIO_NUM      0
- #define SIOD_GPIO_NUM     26      // i2c sda
- #define SIOC_GPIO_NUM     27      // i2c scl
- #define Y9_GPIO_NUM       35
- #define Y8_GPIO_NUM       34
- #define Y7_GPIO_NUM       39
- #define Y6_GPIO_NUM       36
- #define Y5_GPIO_NUM       21
- #define Y4_GPIO_NUM       19
- #define Y3_GPIO_NUM       18
- #define Y2_GPIO_NUM        5
- #define VSYNC_GPIO_NUM    25      // vsync_pin
- #define HREF_GPIO_NUM     23      // href_pin
- #define PCLK_GPIO_NUM     22      // pixel_clock_pin
+  #define CAMERA_MODEL_AI_THINKER
+  #define PWDN_GPIO_NUM     32      // power to camera (on/off)
+  #define RESET_GPIO_NUM    -1      // -1 = not used
+  #define XCLK_GPIO_NUM      0
+  #define SIOD_GPIO_NUM     26      // i2c sda
+  #define SIOC_GPIO_NUM     27      // i2c scl
 
-#elif defined(ESP32CAMFREENOVEESP32WROVERCAM)
-// camera settings (for the Freenove ESP32-Wrover CAM Board Clone - ESP32-CAM Dev Module 4MB Flash - 4MB PSRAM
-// CAMERA_MODEL_WROVER_KIT  
-#define CAMERA_MODEL_WROVER_KIT
-#define PWDN_GPIO_NUM    -1
-#define RESET_GPIO_NUM   -1
-#define XCLK_GPIO_NUM    21
-#define SIOD_GPIO_NUM    26
-#define SIOC_GPIO_NUM    27
-// SDMMC_SLOT_NO_CD
-#define Y9_GPIO_NUM      35
-#define Y8_GPIO_NUM      34
-#define Y7_GPIO_NUM      39
-#define Y6_GPIO_NUM      36
-#define Y5_GPIO_NUM      19
-#define Y4_GPIO_NUM      18
-#define Y3_GPIO_NUM       5
-#define Y2_GPIO_NUM       4
-#define VSYNC_GPIO_NUM   25
-#define HREF_GPIO_NUM    23
-#define PCLK_GPIO_NUM    22
+  #define Y9_GPIO_NUM       35
+  #define Y8_GPIO_NUM       34
+  #define Y7_GPIO_NUM       39
+  #define Y6_GPIO_NUM       36
+  #define Y5_GPIO_NUM       21
+  #define Y4_GPIO_NUM       19
+  #define Y3_GPIO_NUM       18
+  #define Y2_GPIO_NUM        5
 
-#elif defined(ESP32CAMFREENOVEESP32WROVERCAM_S3)
-#define PWDN_GPIO_NUM -1
-#define RESET_GPIO_NUM -1
-#define XCLK_GPIO_NUM 15
-#define SIOD_GPIO_NUM 4
-#define SIOC_GPIO_NUM 5
+  #define VSYNC_GPIO_NUM    25      // vsync_pin
+  #define HREF_GPIO_NUM     23      // href_pin
+  #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
-#define Y2_GPIO_NUM 11
-#define Y3_GPIO_NUM 9
-#define Y4_GPIO_NUM 8
-#define Y5_GPIO_NUM 10
-#define Y6_GPIO_NUM 12
-#define Y7_GPIO_NUM 18
-#define Y8_GPIO_NUM 17
-#define Y9_GPIO_NUM 16
+  #define LED_GPIO_NUM      33
 
-#define VSYNC_GPIO_NUM 6
-#define HREF_GPIO_NUM 7
-#define PCLK_GPIO_NUM 13
+
+#elif defined(ESP32CAMCHINESESELLER)
+  //Chinese Seller
+  #define PWDN_GPIO_NUM    -1
+  #define RESET_GPIO_NUM   -1
+  #define XCLK_GPIO_NUM    10
+  #define SIOD_GPIO_NUM    21
+  #define SIOC_GPIO_NUM    14
+
+  #define Y9_GPIO_NUM      11
+  #define Y8_GPIO_NUM      9
+  #define Y7_GPIO_NUM      8
+  #define Y6_GPIO_NUM      6
+  #define Y5_GPIO_NUM      4
+  #define Y4_GPIO_NUM      2
+  #define Y3_GPIO_NUM      3
+  #define Y2_GPIO_NUM      5
+
+  #define VSYNC_GPIO_NUM   13
+  #define HREF_GPIO_NUM    12
+  #define PCLK_GPIO_NUM    7
+
+  #define LED_GPIO_NUM     34
+
+#elif defined(ESP32CAMFREENOVE)
+  // camera settings (for the Freenove ESP32-Wrover CAM Board Clone - ESP32-CAM Dev Module 4MB Flash - 4MB PSRAM
+  // CAMERA_MODEL_WROVER_KIT  
+  #define CAMERA_MODEL_WROVER_KIT
+  #define PWDN_GPIO_NUM    -1
+  #define RESET_GPIO_NUM   -1
+  #define XCLK_GPIO_NUM    21
+  #define SIOD_GPIO_NUM    26
+  #define SIOC_GPIO_NUM    27
+  // SDMMC_SLOT_NO_CD
+
+  #define Y9_GPIO_NUM      35
+  #define Y8_GPIO_NUM      34
+  #define Y7_GPIO_NUM      39
+  #define Y6_GPIO_NUM      36
+  #define Y5_GPIO_NUM      19
+  #define Y4_GPIO_NUM      18
+  #define Y3_GPIO_NUM       5
+  #define Y2_GPIO_NUM       4
+
+  #define VSYNC_GPIO_NUM   25
+  #define HREF_GPIO_NUM    23
+  #define PCLK_GPIO_NUM    22
+
+  #define LED_GPIO_NUM     2
+
+#elif defined(ESP32CAMFREENOVE_S3)
+  #define PWDN_GPIO_NUM   -1
+  #define RESET_GPIO_NUM  -1
+  #define XCLK_GPIO_NUM   15
+  #define SIOD_GPIO_NUM   4
+  #define SIOC_GPIO_NUM   5
+
+  #define Y2_GPIO_NUM     11
+  #define Y3_GPIO_NUM     9
+  #define Y4_GPIO_NUM     8
+  #define Y5_GPIO_NUM     10
+  #define Y6_GPIO_NUM     12
+  #define Y7_GPIO_NUM     18
+  #define Y8_GPIO_NUM     17
+  #define Y9_GPIO_NUM     16
+
+  #define VSYNC_GPIO_NUM  6
+  #define HREF_GPIO_NUM   7
+  #define PCLK_GPIO_NUM   13
+
+  #define LED_GPIO_NUM    2
 
 #else
 //"Camera model not selected"
@@ -289,9 +345,12 @@ void setup() {
 
  if (serialDebug) {
    Serial.begin(serialSpeed);                     // Start serial communication
-   delay(1000);                               // give time for serial to start
+   delay(2000);                               // give time for serial to start
 
    Serial.setDebugOutput(true);
+
+   Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+   Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
 
    Serial.println("\n\n\n");                      // line feeds
    Serial.println("-----------------------------------");
@@ -301,16 +360,20 @@ void setup() {
    // Serial.print("Reset reason: " + ESP.getResetReason());
  }
 
+ #if !defined(ESP32CAMFREENOVE_S3)
  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
+ #endif
 
- // small indicator led on rear of esp32cam board
- #ifndef ESP32CAMNORESETBEFORE
-   pinMode(indicatorLED, OUTPUT);
-   digitalWrite(indicatorLED,HIGH);
+// small indicator led on rear of esp32cam board
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+   pinMode(LED_GPIO_NUM, OUTPUT);
+   digitalWrite(LED_GPIO_NUM,HIGH);
+   // small indicator led on
+   digitalWrite(LED_GPIO_NUM,LOW);
+// #endif
 
- // Connect to wifi
-   digitalWrite(indicatorLED,LOW);               // small indicator led on
-  #endif
+
+  // Connect to wifi
    if (serialDebug) {
      Serial.print("\nConnecting to ");
      Serial.print(SSID_NAME);
@@ -324,21 +387,23 @@ if (SSID_PASWORD == nullptr) {
   if (serialDebug) Serial.println("Error: SSID_PASWORD not set!");
   while(1); // Stop
 }
-   WiFi.begin(SSID_NAME, SSID_PASWORD);
-   while (WiFi.status() != WL_CONNECTED) {
-       delay(500);
-       if (serialDebug) Serial.print(".");
-   }
-   if (serialDebug) {
-     Serial.print("\nWiFi connected, ");
-     Serial.print("IP address: ");
-     Serial.println(WiFi.localIP());
-   }
-   server.enableCORS();   // allow html to request pages without it being blocked
-   server.begin();                               // start web server
-#ifndef ESP32CAMNORESETBEFORE
-   digitalWrite(indicatorLED,HIGH);              // small indicator led off
-#endif
+
+  WiFi.mode(WIFI_STA);                          // set wifi mode to station
+  WiFi.begin(SSID_NAME, SSID_PASWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      if (serialDebug) Serial.print(".");
+  }
+  if (serialDebug) {
+    Serial.print("\nWiFi connected, ");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  }
+  server.enableCORS();   // allow html to request pages without it being blocked
+  server.begin();                               // start web server
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+   digitalWrite(LED_GPIO_NUM,HIGH);              // small indicator led off
+// #endif
 
  // define the web pages (i.e. call these procedures when url is requested)
    server.on("/", handleRoot);                   // root page
@@ -394,8 +459,9 @@ if (SSID_PASWORD == nullptr) {
      }
    }
 
-#ifdef ESP32CAMNORESETBEFORE
-   if (serialDebug) Serial.println("No SD Card detected");
+   // Freenove ESPs boards don't have an sd card slot, so skip sd card setup and set to no sd card present
+#if defined ESP32CAMFREENOVE_S3 || defined ESP32CAMFREENOVE
+   if (serialDebug) Serial.println("No SD Card on this board!");
    sdcardPresent = 0;                        // flag no sd card available
 #else
 
@@ -416,7 +482,7 @@ if (SSID_PASWORD == nullptr) {
          sdcardPresent = 1;                      // flag sd card available
        }
      }
-#endif // ESP32CAMNORESETBEFORE
+#endif // #if defined ESP32CAMFREENOVE_S3 || defined ESP32CAMFREENOVE
      fs::FS &fs = SD_MMC;                        // sd card file system
 
  // discover the number of image files already stored in '/img' folder of the sd card and set image file counter accordingly
@@ -440,10 +506,12 @@ if (SSID_PASWORD == nullptr) {
        if (serialDebug) Serial.printf("Image file count = %d \n",imageCounter);
    }
 
-#ifndef ESP32CAMNORESETBEFORE
- // define i/o pins
-   pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
-   digitalWrite(indicatorLED,HIGH);          // led off = High
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+  // define i/o pins
+  pinMode(LED_GPIO_NUM, OUTPUT);            // defined again as sd card config can reset it
+  digitalWrite(LED_GPIO_NUM,HIGH);          // led off = High
+// #endif
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
    pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
 #endif
@@ -459,7 +527,7 @@ if (SSID_PASWORD == nullptr) {
    // read pin state with     mcp.digitalRead(8)
  #endif
 
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
 // configure PWM for the illumination LED
   pinMode(brightLED, OUTPUT);
   analogWrite(brightLED, brightLEDbrightness);
@@ -489,10 +557,26 @@ if (SSID_PASWORD == nullptr) {
     #endif
   #endif  
 
- // startup complete
-   if (serialDebug) Serial.println("\nStarted...");
-#ifndef ESP32CAMNORESETBEFORE
+  // print some info on the serial port
+  if (serialDebug) {
+    Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+    Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+    Serial.printf("Sketch size: %u bytes\n", ESP.getSketchSize());
+    Serial.printf("SPIFFS total bytes: %u , used: %u \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+    Serial.printf("SD Card present: %s \n", sdcardPresent ? "Yes" : "No");
+  }
+
+  // startup complete
+  if (serialDebug) {
+    Serial.println("\nStarted...");
+  }
+
+   // flash the indicator LED to show sketch has started
+   if (serialDebug) Serial.println("Sketch started, flashing indicator LED");
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
    flashLED(2);     // flash the onboard indicator led
+// #endif
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
    analogWrite(brightLED, 64);    // change bright LED
    delay(200);
    analogWrite(brightLED, 0);    // change bright LED
@@ -501,9 +585,9 @@ if (SSID_PASWORD == nullptr) {
 }  // setup
 
 
-// ----------------------------------------------------------------
-//   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
-// ----------------------------------------------------------------
+// // ----------------------------------------------------------------
+// //   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
+// // ----------------------------------------------------------------
 
 
 void loop() {
@@ -534,14 +618,252 @@ void loop() {
    if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) {
      lastStatus = millis();                                               // reset timer
      esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
-#ifndef ESP32CAMNORESETBEFORE
-    if (flashIndicatorLED) digitalWrite(indicatorLED,!digitalRead(indicatorLED));     // flip indicator led status
-#endif
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+    if (flashIndicatorLED) digitalWrite(LED_GPIO_NUM,!digitalRead(LED_GPIO_NUM));     // flip indicator led status
+// #endif
    }
 
 }  // loop
+//   Add your code here to handle camera operations, web server requests, etc.
+// }
 
 
+
+
+// ******************************************************************************************************************
+// -------------------------------------------------------------------------
+// SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     
+// -------------------------------------------------------------------------
+
+
+// void setup() {
+//   // Serial.begin(115200);
+//   // delay(2000);                               // give time for serial to start
+//   // Serial.setDebugOutput(true);
+//   // Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+//   // Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+//   // Serial.println("\n\n\n");                      // line feeds
+//   // Serial.println("-----------------------------------");
+//   // Serial.printf("Starting - %s - %s \n", stitle, sversion);
+//   // Serial.println("-----------------------------------");
+//   // Serial.println("Init WiFi...");
+//   // WiFi.begin("Netzwerg", "ST04ra04");
+//   // while (WiFi.status() != WL_CONNECTED) {
+//   //   delay(500);
+//   //   Serial.print(".");
+//   // }
+//   // Serial.print("\nWiFi connected, ");
+//   // Serial.print("IP address: ");
+//   // Serial.println(WiFi.localIP());  
+
+//  if (serialDebug) {
+//    Serial.begin(serialSpeed);                     // Start serial communication
+//    delay(2000);                               // give time for serial to start
+
+//    Serial.setDebugOutput(true);
+
+//    Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+//    Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+
+//    Serial.println("\n\n\n");                      // line feeds
+//    Serial.println("-----------------------------------");
+//    Serial.printf("Starting - %s - %s \n", stitle, sversion);
+//    Serial.println("-----------------------------------");
+//  }
+
+// //  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
+
+//  // small indicator led on rear of esp32cam board
+// //  #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+// //    pinMode(LED_GPIO_NUM, OUTPUT);
+// //    digitalWrite(LED_GPIO_NUM,HIGH);
+// //    // small indicator led on   
+// //    digitalWrite(LED_GPIO_NUM,LOW);  
+ 
+             
+//   // #endif
+//   // Connect to wifi
+//   if (serialDebug) {
+//     Serial.print("\nConnecting to ");
+//     Serial.print(SSID_NAME);
+//     Serial.print("\n   ");
+//   }
+
+//   // Check if SSID_NAME is set
+//   if (SSID_NAME == nullptr) {
+//     if (serialDebug) {
+//       Serial.println("Error: SSID_NAME not set!");
+//     }
+//     while(1); // Stop
+//   } // Check if SSID_NAME is set
+
+//   // Check if SSID_PASWORD is set
+//   if (SSID_PASWORD == nullptr) {
+//     if (serialDebug) {
+//       Serial.println("Error: SSID_PASWORD not set!");
+//     }
+//     while(1); // Stop
+//   } // Check if SSID_PASWORD is set
+
+//   // Start WiFi connection
+//   WiFi.begin(SSID_NAME, SSID_PASWORD);
+//   while (WiFi.status() != WL_CONNECTED) {
+//       delay(500);
+//       if (serialDebug) {
+//         Serial.print(".");
+//       } // Print dot while connecting
+//   }
+
+//   // WiFi connected
+//   if (serialDebug) {
+//     Serial.print("\nWiFi connected, ");
+//     Serial.print("IP address: ");
+//     Serial.println(WiFi.localIP());
+//   }
+
+//   server.enableCORS();   // allow html to request pages without it being blocked
+//   server.begin();        // start web server
+
+//   // define the web pages (i.e. call these procedures when url is requested)
+//   server.on("/", handleRoot);                   // root page
+//   server.on("/data", handleData);               // suplies data to periodically update root (AJAX)
+//   server.on("/jpg", handleJPG);                 // capture image and send as jpg
+//   server.on("/jpeg", handleJpeg);                // show updating image
+//   server.on("/stream", handleStream);           // stream live video
+//   server.on("/photo", handlePhoto);             // save image to sd card
+//   server.on("/img", handleImg);                 // show image from sd card
+//   server.on("/rgb", readRGBImage);              // demo converting image to RGB
+//   server.on("/graydata", readGrayscaleImage);   // look at grayscale image data
+//   server.on("/test", handleTest);               // Testing procedure
+//   server.on("/reboot", handleReboot);           // restart device
+//   server.on("/ping", handlePing);               // for checking camera is responding
+//   server.on("/switch", handleSwitch);           // switch gpio pin via a url
+//   server.onNotFound(handleNotFound);            // invalid url requested
+// #if ENABLE_OTA   
+//   server.on("/ota", handleOTA);                 // ota updates web page
+// #endif
+
+// // NTP - internet time
+//   if (serialDebug) Serial.println("\nGetting real time (NTP)");
+//   configTime(0, 0, ntpServer);
+//   setenv("TZ", TZ_INFO, 1);
+//   if (getNTPtime(10)) {  // wait up to 10 sec to sync
+//   } else {
+//     if (serialDebug) Serial.println("Time not set");
+//   }
+//   lastNTPtime = time(&now);
+
+// // set up camera
+//     if (serialDebug) Serial.print(("\nInitialising camera: "));
+//     if (initialiseCamera(1)) {           // apply settings from 'config' and start camera
+//       if (serialDebug) Serial.println("OK");
+//     }
+//     else {
+//       if (serialDebug) Serial.println("failed");
+//     }
+
+// // Spiffs - for storing images without an sd card
+// //       see: https://circuits4you.com/2018/01/31/example-of-esp8266-flash-file-system-spiffs/
+//   if (!SPIFFS.begin(true)) {
+//     if (serialDebug) Serial.println(("An Error has occurred while mounting SPIFFS - restarting"));
+//     delay(5000);
+//     ESP.restart();                               // restart and try again
+//     delay(5000);
+//   } else {
+//     // SPIFFS.format();      // wipe spiffs
+//     delay(5000);
+//     if (serialDebug) {
+//       Serial.print(("SPIFFS mounted successfully: "));
+//       Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+//     }
+//   }
+
+//   //print heap
+//   if (serialDebug) {
+//     Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+//     Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+//   }
+
+//   if (serialDebug) {
+//     Serial.println("No SD Card detected");
+//   }
+//   sdcardPresent = 0;           // flag no sd card available
+
+//   fs::FS &fs = SD_MMC;                        // sd card file system
+
+//   // discover the number of image files already stored in '/img' folder of the sd card and set image file counter accordingly
+//   imageCounter = 0;
+
+//   // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
+// #if defined ESP32
+//   esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
+//   #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
+//     // v3 board manager detected
+//       if (serialDebug) Serial.println("Watchdog timer: v3 esp32 board manager detected");
+//       esp_task_wdt_config_t wdt_config = {
+//           .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
+//           .idle_core_mask = 1 << 0,         // Which core to monitor
+//           .trigger_panic = true             // Enable panic
+//       };
+//     // Initialize the WDT with the configuration structure
+//       esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
+//       esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
+//       esp_task_wdt_reset();                 // reset timer
+//       if (serialDebug) Serial.println("Watchdog Timer initialized");
+//   #else
+//     // pre v3 board manager assumed
+//       if (serialDebug) Serial.println("Watchdog timer: Older esp32 board manager detected");
+//       esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
+//       esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+//   #endif
+// #endif  
+
+//   //print heap
+//   if (serialDebug) {
+//     Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+//     Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+//   }
+
+//  // startup complete
+//    if (serialDebug) Serial.println("\nStarted...");
+
+// }
+
+
+
+
+
+// ******************************************************************************************************************
+// ----------------------------------------------------------------
+//   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
+// ----------------------------------------------------------------
+// void loop() {
+//   // Serial.println("Looping...");
+//   server.handleClient();          // handle any incoming web page requests
+
+
+
+// // reset the watchdog timer to prevent system restart
+//   if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) {
+//     lastStatus = millis();                                               // reset timer
+//     Serial.println("Resetting watchdog timer..."); // Debug message
+//     esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
+// // #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+// //     if (flashIndicatorLED) digitalWrite(LED_GPIO_NUM,!digitalRead(LED_GPIO_NUM));     // flip indicator led status
+// // #endif
+//   }
+
+//   //print heap
+//   // if (serialDebug) {
+//   //   Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+//   //   Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+//   // }
+
+// }
+
+
+
+// ******************************************************************************************************************
 // ----------------------------------------------------------------
 //                        Initialise the camera
 // ----------------------------------------------------------------
@@ -598,7 +920,8 @@ if (reset) {
 
    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
    if (camerr != ESP_OK) {
-     if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
+     if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr); 
+     return 0;                          // return false if camera initialisation failed
    }
 
    cameraImageSettings(0);                       // apply the camera image settings
@@ -716,14 +1039,14 @@ String localTime() {
 //        flash the indicator led 'reps' number of times
 // ----------------------------------------------------------------
 void flashLED(int reps) {
-#ifndef ESP32CAMNORESETBEFORE
+// #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
  for(int x=0; x < reps; x++) {
-   digitalWrite(indicatorLED,LOW);
+   digitalWrite(LED_GPIO_NUM,LOW);
    delay(1000);
-   digitalWrite(indicatorLED,HIGH);
+   digitalWrite(LED_GPIO_NUM,HIGH);
    delay(500);
  }
-#endif
+// #endif
 }
 
 
@@ -843,7 +1166,7 @@ byte storeImage() {
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
    if (flashRequired) {
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
       analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
       delay(100);
 #endif
@@ -852,7 +1175,7 @@ byte storeImage() {
   fb = esp_camera_fb_get();
 
    if (flashRequired){
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
       delay(100);
       analogWrite(brightLED, currentBrightness);   // change LED brightness back to previous state
 #endif
@@ -954,7 +1277,7 @@ void rootUserInput(WiFiClient &client) {
     // if button1 was pressed (toggle io pin B)
       if (server.hasArg("button1")) {
         if (serialDebug) Serial.println("Button 1 pressed");
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
         digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
 #endif
       }
@@ -966,7 +1289,7 @@ void rootUserInput(WiFiClient &client) {
         else if (brightLEDbrightness == 10) brightLEDbrightness = 40;          // turn led on medium
         else if (brightLEDbrightness == 40) brightLEDbrightness = 255;         // turn led on full
         else brightLEDbrightness = 0;                                          // turn led off
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
         analogWrite(brightLED, brightLEDbrightness);
 #endif
       }
@@ -1216,7 +1539,7 @@ void handleData(){
     server.sendContent(",");
 
   // line4 - gpio pin status
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
     server.sendContent("GPIO output pin 12 is: ");
     server.sendContent( (digitalRead(iopinB)==1) ? "ON" : "OFF" );
     server.sendContent(" &ensp; GPIO input pin 13 is: ");
@@ -1801,7 +2124,7 @@ void readGrayscaleImage() {
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
     if (flashRequired) {
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
       analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
       delay(100);
 #endif
@@ -1810,7 +2133,7 @@ void readGrayscaleImage() {
     fb = esp_camera_fb_get();
 
     if (flashRequired){
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
       delay(100);
       analogWrite(brightLED, currentBrightness);            // change LED brightness back to previous state
 #endif
@@ -1932,13 +2255,13 @@ void handleSwitch() {
           if (Tvalue != NULL) {
             int val = Tvalue.toInt();        
             if (val == 0) {
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
               digitalWrite(iopinB, LOW);
 #endif
               reply = "Switched off";
             }
             if (val == 1) {
-#ifndef ESP32CAMNORESETBEFORE
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
               digitalWrite(iopinB, HIGH);
 #endif
               reply = "Switched on";
