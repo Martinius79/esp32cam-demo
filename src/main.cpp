@@ -54,20 +54,26 @@
 // for standard ESP32-CAM AI Thinker board
 // #undef ESP32CAMFREENOVE
 // #undef ESP32CAMFREENOVE_S3
+// #undef ESP32CAMCHINESESELLER
 // #define ESP32CAMAITHINKER 1
 
 // for Freenove ESP32-Wrover CAM Board - ESP32-CAM Dev Module 4MB Flash - 4MB PSRAM
 // #undef ESP32CAMAITHINKER
 // #undef ESP32CAMFREENOVE_S3
+// #undef ESP32CAMCHINESESELLER
 // #define ESP32CAMFREENOVE 1
 
 // for Freenove ESP32-Wrover S3 Board - ESP32-S3-CAM Dev Module 16MB Flash - 8MB PSRAM
-// #undef ESP32CAMAITHINKER
-// #undef ESP32CAMFREENOVE
-// #define ESP32CAMFREENOVE_S3 1
+#undef ESP32CAMAITHINKER
+#undef ESP32CAMFREENOVE
+#undef ESP32CAMCHINESESELLER
+#define ESP32CAMFREENOVE_S3 1
 
 // for Chinese Seller ESP32-CAM board
-#define ESP32CAMCHINESESELLER 1
+// #undef ESP32CAMAITHINKER
+// #undef ESP32CAMFREENOVE
+// #undef ESP32CAMFREENOVE_S3
+// #define ESP32CAMCHINESESELLER 1
 
 
 //   ---------------------------------------------------------------------------------------------------------
