@@ -49,6 +49,62 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 #include "_USER_DEFINES.h"         // user settings (wifi, OTA, etc.)
+#include <WiFi.h> // ESP32
+
+void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+  switch (event)
+  {
+  case ARDUINO_EVENT_WIFI_STA_START:
+    // WifiState = disconnected;
+    Serial.println("Station Mode Started");
+    break;
+  case ARDUINO_EVENT_WIFI_STA_CONNECTED: // IP not yet assigned
+    Serial.println("Connected to AP: " + String(WiFi.SSID()));
+    break;
+  case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+    Serial.print("Got IP: ");
+    Serial.println(WiFi.localIP());
+    // WifiState = connected;
+    break;
+  case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+    // WifiState = disconnected;
+    Serial.print("WiFi lost connection. Reason: ");
+    Serial.println(info.wifi_sta_disconnected.reason);
+    // WifiReconnect();
+    break;
+#ifdef WIFI_USE_WPS // WPS code
+  case ARDUINO_EVENT_WPS_ER_SUCCESS:
+    WifiState = wps_success;
+    Serial.println("WPS Successful, stopping WPS and connecting to: " + String(WiFi.SSID()));
+    esp_wifi_wps_disable();
+    delay(10);
+    WiFi.begin();
+    break;
+  case ARDUINO_EVENT_WPS_ER_FAILED:
+    WifiState = wps_failed;
+    Serial.println("WPS Failed, retrying");
+    esp_wifi_wps_disable();
+    wpsInitConfig();
+    esp_wifi_wps_enable(&wps_config);
+    esp_wifi_wps_start(0);
+    break;
+  case ARDUINO_EVENT_WPS_ER_TIMEOUT:
+    Serial.println("WPS Timeout, retrying");
+    tfts.setTextColor(TFT_RED, TFT_BLACK);
+    tfts.print("/"); // retry
+    tfts.setTextColor(TFT_BLUE, TFT_BLACK);
+    esp_wifi_wps_disable();
+    wpsInitConfig();
+    esp_wifi_wps_enable(&wps_config);
+    esp_wifi_wps_start(0);
+    WifiState = wps_active;
+    break;
+#endif
+  default:
+    break;
+  }
+}
 
 //   ---------------------------------------------------------------------------------------------------------
 // for standard ESP32-CAM AI Thinker board
@@ -64,17 +120,62 @@
 // #define ESP32CAMFREENOVE 1
 
 // for Freenove ESP32-Wrover S3 Board - ESP32-S3-CAM Dev Module 16MB Flash - 8MB PSRAM
-#undef ESP32CAMAITHINKER
-#undef ESP32CAMFREENOVE
-#undef ESP32CAMCHINESESELLER
-#define ESP32CAMFREENOVE_S3 1
-
-// for Chinese Seller ESP32-CAM board
 // #undef ESP32CAMAITHINKER
 // #undef ESP32CAMFREENOVE
-// #undef ESP32CAMFREENOVE_S3
-// #define ESP32CAMCHINESESELLER 1
+// #undef ESP32CAMCHINESESELLER
+// #define ESP32CAMFREENOVE_S3 1
 
+// for Chinese Seller ESP32-CAM board
+#undef ESP32CAMAITHINKER
+#undef ESP32CAMFREENOVE
+#undef ESP32CAMFREENOVE_S3
+#define ESP32CAMCHINESESELLER 1
+
+//   ---------------------------------------------------------------------------------------------------------
+
+#if defined(ESP32CAMFREENOVE_S3)
+
+#include <Adafruit_NeoPixel.h> // Die Adafruit NeoPixel Bibliothek
+
+#define LED_COUNT  1
+#if defined(ESP32CAMFREENOVE_S3)
+  #define LED_PIN    48
+#elif defined(ESP32CAMCHINESESELLER)
+  // #define LED_PIN    34
+#endif
+#define LED_PIN	48
+#define RMT_CHANNEL 0
+
+// Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// Globale Variablen für den nicht-blockierenden Regenbogen-Effekt
+static unsigned long previousMillisRainbow = 0;
+const long rainbowInterval = 20; // Aktualisierungsintervall für den Regenbogen in ms
+static long currentRainbowHue = 0; // Aktueller Farbton für den Regenbogen
+
+void colorWipe(uint32_t color, int wait);
+void updateRainbow();
+
+#endif //ESP32CAMFREENOVE_S3
+
+//   ---------------------------------------------------------------------------------------------------------
+
+#if defined(ESP32CAMCHINESESELLER)
+
+// #include <esp_psram.h>
+// #include "driver/spi_common.h"
+// #include <esp_private/esp_psram_io.h>
+
+// void setup_psram_pins() {
+//     psram_set_cs_io(32);
+//     psram_set_clk_io(33);
+//     psram_set_q_io(34);
+//     psram_set_d_io(35);
+//     psram_set_wp_io(31);
+//     psram_set_hold_io(30);
+// }
+
+#endif //ESP32CAMCHINESESELLER
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -164,17 +265,17 @@
  
 
  // Bright LED (Flash)
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
   const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
 #endif
-   int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
-   const int ledFreq = 5000;                            // PWM settings
-   const int ledChannel = 15;                           // camera uses timer1
-   const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
+  int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
+  const int ledFreq = 5000;                            // PWM settings
+  const int ledChannel = 15;                           // camera uses timer1
+  const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
 
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
- const int iopinA = 13;                                 // general io pin 13
- const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
+  const int iopinA = 13;                                 // general io pin 13
+  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
 #endif
 
 
@@ -358,7 +459,7 @@ void setup() {
    Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
    Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
 
-   Serial.println("\n\n\n");                      // line feeds
+   Serial.println("\n");                      // line feed
    Serial.println("-----------------------------------");
    Serial.printf("Starting - %s - %s \n", stitle, sversion);
    Serial.println("-----------------------------------");
@@ -370,36 +471,79 @@ void setup() {
  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
  #endif
 
+#if defined(ESP32CAMFREENOVE_S3)
+  // Initialisiere die NeoPixel-Bibliothek
+  // strip.begin();
+  // Setze alle LEDs auf "Aus" und aktualisiere die Anzeige
+  // strip.show();
+  Serial.println("Adafruit NeoPixel Beispiel gestartet!");
+#endif
+
 // small indicator led on rear of esp32cam board
 // #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
    pinMode(LED_GPIO_NUM, OUTPUT);
    digitalWrite(LED_GPIO_NUM,HIGH);
+   delay(200);                               // give time for led to turn on
    // small indicator led on
    digitalWrite(LED_GPIO_NUM,LOW);
 // #endif
 
 
-  // Connect to wifi
-   if (serialDebug) {
-     Serial.print("\nConnecting to ");
-     Serial.print(SSID_NAME);
-     Serial.print("\n   ");
-   }
-   if (SSID_NAME == nullptr) {
+if (SSID_NAME == nullptr) {
   if (serialDebug) Serial.println("Error: SSID_NAME not set!");
   while(1); // Stop
 }
-if (SSID_PASWORD == nullptr) {
-  if (serialDebug) Serial.println("Error: SSID_PASWORD not set!");
+if (SSID_PASSWORD == nullptr) {
+  if (serialDebug) Serial.println("Error: SSID_PASSWORD not set!");
   while(1); // Stop
 }
 
+// Connect to wifi
+if (serialDebug) {
+  Serial.print("\nConnecting to ");
+  Serial.print(SSID_NAME);
+  Serial.print("\n   ");
+}
+
+  Serial.println("Connecting to WiFi...");
+  WiFi.disconnect(true);                        // disconnect from any previous connection
+  delay(1000);                                 // give time to disconnect 
+  // print wifi status
+  if (serialDebug) {
+    //print password if it is set
+    if (SSID_PASSWORD != nullptr && SSID_PASSWORD[0] !='\0') {
+      Serial.print("SSID: ");
+      Serial.println(SSID_NAME);
+      Serial.print("Password: ");
+      Serial.println(SSID_PASSWORD);
+    } else {
+      Serial.println("SSID: " + String(SSID_NAME));
+      Serial.println("Password: not set");
+    }
+  }
+
+  
   WiFi.mode(WIFI_STA);                          // set wifi mode to station
-  WiFi.begin(SSID_NAME, SSID_PASWORD);
+  WiFi.begin(SSID_NAME, SSID_PASSWORD);
+  WiFi.onEvent(WiFiEvent);
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  WiFi.setHostname("ESP32-TRYOUT"); // set hostname for mDNS
+
+  if (WiFi.status() == WL_CONNECT_FAILED) {
+    if (serialDebug) Serial.println("WiFi connection failed");
+  }
+
+  unsigned long StartTime = millis();
   while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
+      delay(500); // print a dot every 500ms to show we are still trying to connect
+      if ((millis() - StartTime) > (20 * 1000))
+      {    
+        Serial.println("\r\nWiFi connection timeout!");
+        break; // exit loop, exit procedure, continue clock startup
+      }
       if (serialDebug) Serial.print(".");
   }
+
   if (serialDebug) {
     Serial.print("\nWiFi connected, ");
     Serial.print("IP address: ");
@@ -517,7 +661,7 @@ if (SSID_PASWORD == nullptr) {
   pinMode(LED_GPIO_NUM, OUTPUT);            // defined again as sd card config can reset it
   digitalWrite(LED_GPIO_NUM,HIGH);          // led off = High
 // #endif
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
    pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
 #endif
@@ -533,7 +677,7 @@ if (SSID_PASWORD == nullptr) {
    // read pin state with     mcp.digitalRead(8)
  #endif
 
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
 // configure PWM for the illumination LED
   pinMode(brightLED, OUTPUT);
   analogWrite(brightLED, brightLEDbrightness);
@@ -582,7 +726,7 @@ if (SSID_PASWORD == nullptr) {
 // #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
    flashLED(2);     // flash the onboard indicator led
 // #endif
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
    analogWrite(brightLED, 64);    // change bright LED
    delay(200);
    analogWrite(brightLED, 0);    // change bright LED
@@ -591,25 +735,27 @@ if (SSID_PASWORD == nullptr) {
 }  // setup
 
 
-// // ----------------------------------------------------------------
+
+
+
+
+
+
+// // --------------------------------------------------------------------------------------------------------------------
 // //   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
-// // ----------------------------------------------------------------
+// // --------------------------------------------------------------------------------------------------------------------
 
 
 void loop() {
-
+// Serial.println("Looping...");
  server.handleClient();          // handle any incoming web page requests
 
-
-
-
-
+#if defined(ESP32CAMFREENOVE_S3)
+  // Handle NeoPixel animations
+  // updateRainbow(); // Rainbow animation with a delay of 10 milliseconds
+#endif
 
  //                           <<< YOUR CODE HERE >>>
-
-
-
-
 
 
 //  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
@@ -636,10 +782,28 @@ void loop() {
 
 
 
-// ******************************************************************************************************************
-// -------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// *******************************************************************************************************************************************
+
+
+// Alternative stuff for TRYOUT
+
+// --------------------------------------------------------------------------------------------------------------------
 // SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     
-// -------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 
 // void setup() {
@@ -869,7 +1033,20 @@ void loop() {
 
 
 
-// ******************************************************************************************************************
+// ********************************************************************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ----------------------------------------------------------------
 //                        Initialise the camera
 // ----------------------------------------------------------------
@@ -1172,7 +1349,7 @@ byte storeImage() {
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
    if (flashRequired) {
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
       analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
       delay(100);
 #endif
@@ -1181,7 +1358,7 @@ byte storeImage() {
   fb = esp_camera_fb_get();
 
    if (flashRequired){
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
       delay(100);
       analogWrite(brightLED, currentBrightness);   // change LED brightness back to previous state
 #endif
@@ -1283,7 +1460,7 @@ void rootUserInput(WiFiClient &client) {
     // if button1 was pressed (toggle io pin B)
       if (server.hasArg("button1")) {
         if (serialDebug) Serial.println("Button 1 pressed");
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
         digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
 #endif
       }
@@ -1295,7 +1472,7 @@ void rootUserInput(WiFiClient &client) {
         else if (brightLEDbrightness == 10) brightLEDbrightness = 40;          // turn led on medium
         else if (brightLEDbrightness == 40) brightLEDbrightness = 255;         // turn led on full
         else brightLEDbrightness = 0;                                          // turn led off
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
         analogWrite(brightLED, brightLEDbrightness);
 #endif
       }
@@ -1545,7 +1722,7 @@ void handleData(){
     server.sendContent(",");
 
   // line4 - gpio pin status
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
     server.sendContent("GPIO output pin 12 is: ");
     server.sendContent( (digitalRead(iopinB)==1) ? "ON" : "OFF" );
     server.sendContent(" &ensp; GPIO input pin 13 is: ");
@@ -2130,7 +2307,7 @@ void readGrayscaleImage() {
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
     if (flashRequired) {
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
       analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
       delay(100);
 #endif
@@ -2139,7 +2316,7 @@ void readGrayscaleImage() {
     fb = esp_camera_fb_get();
 
     if (flashRequired){
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
       delay(100);
       analogWrite(brightLED, currentBrightness);            // change LED brightness back to previous state
 #endif
@@ -2261,13 +2438,13 @@ void handleSwitch() {
           if (Tvalue != NULL) {
             int val = Tvalue.toInt();        
             if (val == 0) {
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
               digitalWrite(iopinB, LOW);
 #endif
               reply = "Switched off";
             }
             if (val == 1) {
-#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
+#if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE) && !defined(ESP32CAMCHINESESELLER)
               digitalWrite(iopinB, HIGH);
 #endif
               reply = "Switched on";
@@ -2387,6 +2564,43 @@ void handleTest() {
  sendFooter(client);     // close web page
 
 }  // handleTest
+
+// #if defined(ESP32CAMFREENOVE_S3)
+// // Hilfsfunktion: LEDs nacheinander in einer bestimmten Farbe einschalten
+// // Die Adafruit Bibliothek verwendet strip.Color(R, G, B)
+// void colorWipe(uint32_t color, int wait) {
+//   for(int i=0; i<strip.numPixels(); i++) { // Für jede LED in der Kette
+//     strip.setPixelColor(i, color);   // Setze die Farbe
+//     strip.show();                    // Aktualisiere die Anzeige
+//     delay(wait);                     // Warte kurz
+//   }
+// }
+
+// // Hilfsfunktion: Regenbogen-Effekt
+// // Diese Funktion verwendet die ColorHSV-Funktion der Adafruit Bibliothek
+// void updateRainbow() {
+//   unsigned long currentMillis = millis();
+
+//   // Prüfe, ob es Zeit ist, den Regenbogen-Effekt zu aktualisieren
+//   if (currentMillis - previousMillisRainbow >= rainbowInterval) {
+//     previousMillisRainbow = currentMillis; // Speichere die letzte Aktualisierungszeit
+
+//     // Aktualisiere alle Pixel für den aktuellen Farbton
+//     for(int i=0; i<strip.numPixels(); i++) { // Für jede LED in der Kette
+//       int pixelHue = currentRainbowHue + (i * 65536L / strip.numPixels());
+//       strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
+//     }
+//     strip.show(); // Aktualisiere die LED-Leiste
+
+//     // Erhöhe den Farbton für die nächste Aktualisierung
+//     currentRainbowHue += 256; // Gleicher Schritt wie in der ursprünglichen Schleife
+//     if (currentRainbowHue >= 5 * 65536) { // Setze zurück, wenn 5 volle Zyklen erreicht sind
+//       currentRainbowHue = 0;
+//     }
+//   }
+// }
+// #endif // defined(ESP32CAMFREENOVE_S3)
+
 
 
 // ******************************************************************************************************************
