@@ -133,52 +133,132 @@ void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
 
 //   ---------------------------------------------------------------------------------------------------------
 
-#if defined(ESP32CAMFREENOVE_S3)
+#if defined(ESP32CAMFREENOVE_S3) || defined(ESP32CAMCHINESESELLER)
 
 #include <Adafruit_NeoPixel.h> // Die Adafruit NeoPixel Bibliothek
 
 #define LED_COUNT  1
+
 #if defined(ESP32CAMFREENOVE_S3)
   #define LED_PIN    48
 #elif defined(ESP32CAMCHINESESELLER)
-  // #define LED_PIN    34
+  #define LED_PIN    33
 #endif
-#define LED_PIN	48
+
 #define RMT_CHANNEL 0
 
-// Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // Globale Variablen für den nicht-blockierenden Regenbogen-Effekt
 static unsigned long previousMillisRainbow = 0;
-const long rainbowInterval = 20; // Aktualisierungsintervall für den Regenbogen in ms
+const long rainbowInterval = 100; // Aktualisierungsintervall für den Regenbogen in ms
 static long currentRainbowHue = 0; // Aktueller Farbton für den Regenbogen
 
-void colorWipe(uint32_t color, int wait);
+// void colorWipe(uint32_t color, int wait);
 void updateRainbow();
 
 #endif //ESP32CAMFREENOVE_S3
 
-//   ---------------------------------------------------------------------------------------------------------
-
 #if defined(ESP32CAMCHINESESELLER)
 
-// #include <esp_psram.h>
-// #include "driver/spi_common.h"
-// #include <esp_private/esp_psram_io.h>
+#include <driver/i2s.h>
+#include "driver/gpio.h" // For GPIO_NUM_X definitions
 
-// void setup_psram_pins() {
-//     psram_set_cs_io(32);
-//     psram_set_clk_io(33);
-//     psram_set_q_io(34);
-//     psram_set_d_io(35);
-//     psram_set_wp_io(31);
-//     psram_set_hold_io(30);
-// }
+// I2S Pins for the MSM261S4030H0R Microphone
+// Based on your input: SD = GPIO35, SCK = GPIO36, WS = GPIO37
+#define I2S_SCK_PIN       GPIO_NUM_36
+#define I2S_WS_PIN        GPIO_NUM_37
+#define I2S_SD_PIN        GPIO_NUM_35
 
-#endif //ESP32CAMCHINESESELLER
+// I2S Configuration
+#define SAMPLE_RATE       16000     // Typical sample rate for speech (Hz)
+#define BITS_PER_SAMPLE   I2S_BITS_PER_SAMPLE_16BIT // 16 bits per sample
+#define CHANNELS          I2S_CHANNEL_MONO        // Mono microphone
+
+// Buffer to store audio data
+const int SAMPLE_BUFFER_SIZE = 1024; // Number of 16-bit samples
+int16_t sampleBuffer[SAMPLE_BUFFER_SIZE];
+
+void setupMicrophone() {
+  i2s_config_t i2s_config = {
+    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX), // Master mode, receive mode
+    .sample_rate = SAMPLE_RATE,
+    .bits_per_sample = BITS_PER_SAMPLE,
+    // I2S_CHANNEL_FMT_RIGHT_LEFT for stereo, but for mono, it often depends on how the microphone sends data.
+    // For many digital microphones, LEFT_RIGHT or RIGHT_LEFT is fine.
+    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .communication_format = I2S_COMM_FORMAT_STAND_I2S, // Standard I2S format
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, // Interrupt flags
+    .dma_buf_count = 8, // Number of DMA buffers
+    .dma_buf_len = 64,  // Size of each DMA buffer in samples (not bytes)
+    .use_apll = false,  // Do not use APLL (standard PLL is usually sufficient)
+    .tx_desc_auto_clear = false // Not relevant for RX
+  };
+
+  i2s_pin_config_t pin_config = {
+    .mck_io_num = I2S_PIN_NO_CHANGE,      // Master clock not used
+    .bck_io_num = I2S_SCK_PIN,            // Bit Clock
+    .ws_io_num = I2S_WS_PIN,              // Word Select (Left/Right Clock)
+    .data_out_num = I2S_PIN_NO_CHANGE,    // No Data Output for microphone
+    .data_in_num = I2S_SD_PIN             // Serial Data Input
+  };
+
+  // Install the I2S driver for I2S_NUM_0 port
+  esp_err_t err = i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  if (err != ESP_OK) {
+    Serial.printf("Error installing I2S driver: 0x%x\n", err);
+    return;
+  }
+
+  // Set the pin configuration
+  err = i2s_set_pin(I2S_NUM_0, &pin_config);
+  if (err != ESP_OK) {
+    Serial.printf("Error setting I2S pins: 0x%x\n", err);
+    return;
+  }
+  
+  Serial.println("Microphone (I2S) initialized.");
+}
+
+void readMicrophoneData() {
+  size_t bytes_read;
+  esp_err_t err = i2s_read(I2S_NUM_0, (char *)sampleBuffer, SAMPLE_BUFFER_SIZE * sizeof(int16_t), &bytes_read, portMAX_DELAY);
+  
+  if (err == ESP_OK && bytes_read > 0) {
+    // Process the audio data in sampleBuffer
+
+    
+    // For example, you can print the first few samples
+    // Serial.print("Read ");
+    // Serial.print(bytes_read / sizeof(int16_t));
+    // Serial.println(" samples from I2S microphone.");
+    
+    // for (int i = 0; i < 10 && i < bytes_read / sizeof(int16_t); i++) {
+    //   Serial.print(sampleBuffer[i]);
+    //   Serial.print(" ");
+    // }
+    // Serial.println();
+
+    // int16_t minVal = sampleBuffer[0];
+    // int16_t maxVal = sampleBuffer[0];
+    // int32_t sum = 0;
+    // for (int i = 0; i < bytes_read / sizeof(int16_t); i++) {
+    //   int16_t v = sampleBuffer[i];
+    //   if (v < minVal) minVal = v;
+    //   if (v > maxVal) maxVal = v;
+    //   sum += v;
+    // }
+    // float avg = sum / float(bytes_read / sizeof(int16_t));
+    // Serial.printf("Min: %d, Max: %d, Avg: %.2f\n", minVal, maxVal, avg);
+    // Serial.println();
+  } else {
+    Serial.printf("Error reading I2S data: 0x%x\n", err);
+  }
+}
+
+#endif
 
 //   ---------------------------------------------------------------------------------------------------------
-
 
 
 //                          ====================================== 
@@ -303,11 +383,14 @@ void updateRainbow();
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
+  // Single color LED
   #define LED_GPIO_NUM      33
 
 
 #elif defined(ESP32CAMCHINESESELLER)
   //Chinese Seller
+
+  //Camera settings
   #define PWDN_GPIO_NUM    -1
   #define RESET_GPIO_NUM   -1
   #define XCLK_GPIO_NUM    10
@@ -327,7 +410,16 @@ void updateRainbow();
   #define HREF_GPIO_NUM    12
   #define PCLK_GPIO_NUM    7
 
+  // Single color LED
   #define LED_GPIO_NUM     34
+
+  // SD Card
+  #define SDMMC_SLOT_CMD   39
+  #define SDMMC_SLOT_CLK   42
+  #define SDMMC_SLOT_D0    41
+  #define SDMMC_SLOT_D1    40
+  #define SDMMC_SLOT_D2    37
+  #define SDMMC_SLOT_D3    38
 
 #elif defined(ESP32CAMFREENOVE)
   // camera settings (for the Freenove ESP32-Wrover CAM Board Clone - ESP32-CAM Dev Module 4MB Flash - 4MB PSRAM
@@ -353,6 +445,7 @@ void updateRainbow();
   #define HREF_GPIO_NUM    23
   #define PCLK_GPIO_NUM    22
 
+  // Single color LED
   #define LED_GPIO_NUM     2
 
 #elif defined(ESP32CAMFREENOVE_S3)
@@ -471,12 +564,18 @@ void setup() {
  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
  #endif
 
-#if defined(ESP32CAMFREENOVE_S3)
+#if defined(ESP32CAMFREENOVE_S3) || defined(ESP32CAMCHINESESELLER)
   // Initialisiere die NeoPixel-Bibliothek
-  // strip.begin();
+  strip.begin();
   // Setze alle LEDs auf "Aus" und aktualisiere die Anzeige
-  // strip.show();
+  strip.show();
   Serial.println("Adafruit NeoPixel Beispiel gestartet!");
+#endif
+
+#if defined(ESP32CAMCHINESESELLER)
+  // Initialize the I2S microphone
+  setupMicrophone();
+  Serial.println("I2S Microphone initialized.");
 #endif
 
 // small indicator led on rear of esp32cam board
@@ -615,23 +714,27 @@ if (serialDebug) {
    sdcardPresent = 0;                        // flag no sd card available
 #else
 
- // SD Card - if one is detected set 'sdcardPresent' High
-     if (!SD_MMC.begin("/sdcard", true)) {        // if loading sd card fails
-       // note: ('/sdcard", true)' = 1bit mode - see: https://dr-mntn.net/2021/02/using-the-sd-card-in-1-bit-mode-on-the-esp32-cam-from-ai-thinker
-       if (serialDebug) Serial.println("No SD Card detected");
-       sdcardPresent = 0;                        // flag no sd card available
-     } else {
-       uint8_t cardType = SD_MMC.cardType();
-       if (cardType == CARD_NONE) {              // if invalid card found
-           if (serialDebug) Serial.println("SD Card type detect failed");
-           sdcardPresent = 0;                    // flag no sd card available
-       } else {
-         // valid sd card detected
-         uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-         if (serialDebug) Serial.printf("SD Card found, free space = %dmB \n", SDfreeSpace);
-         sdcardPresent = 1;                      // flag sd card available
-       }
-     }
+    // SD Card - if one is detected set 'sdcardPresent' High
+#if defined (ESP32CAMCHINESESELLER)
+      SD_MMC.setPins(SDMMC_SLOT_CLK, SDMMC_SLOT_CMD, SDMMC_SLOT_D0, SDMMC_SLOT_D1, SDMMC_SLOT_D2, SDMMC_SLOT_D3);
+#endif
+
+    if (!SD_MMC.begin("/sdcard", true)) {        // if loading sd card fails
+      // note: ('/sdcard", true)' = 1bit mode - see: https://dr-mntn.net/2021/02/using-the-sd-card-in-1-bit-mode-on-the-esp32-cam-from-ai-thinker
+      if (serialDebug) Serial.println("No SD Card detected");
+      sdcardPresent = 0;                        // flag no sd card available
+    } else {
+      uint8_t cardType = SD_MMC.cardType();
+      if (cardType == CARD_NONE) {              // if invalid card found
+          if (serialDebug) Serial.println("SD Card type detect failed");
+          sdcardPresent = 0;                    // flag no sd card available
+      } else {
+        // valid sd card detected
+        uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
+        if (serialDebug) Serial.printf("SD Card found, free space = %dmB \n", SDfreeSpace);
+        sdcardPresent = 1;                      // flag sd card available
+      }
+    }
 #endif // #if defined ESP32CAMFREENOVE_S3 || defined ESP32CAMFREENOVE
      fs::FS &fs = SD_MMC;                        // sd card file system
 
@@ -750,9 +853,14 @@ void loop() {
 // Serial.println("Looping...");
  server.handleClient();          // handle any incoming web page requests
 
-#if defined(ESP32CAMFREENOVE_S3)
+#if defined(ESP32CAMFREENOVE_S3) || defined(ESP32CAMCHINESESELLER)
   // Handle NeoPixel animations
-  // updateRainbow(); // Rainbow animation with a delay of 10 milliseconds
+  updateRainbow(); // Rainbow animation with a delay of 100 milliseconds
+#endif
+
+#if defined(ESP32CAMCHINESESELLER)
+  // Handle I2S microphone data
+  readMicrophoneData(); // Read microphone data and process it
 #endif
 
  //                           <<< YOUR CODE HERE >>>
@@ -788,261 +896,7 @@ void loop() {
 
 
 
-
-
-
-
-
-
-
-
 // *******************************************************************************************************************************************
-
-
-// Alternative stuff for TRYOUT
-
-// --------------------------------------------------------------------------------------------------------------------
-// SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     SETUP     
-// --------------------------------------------------------------------------------------------------------------------
-
-
-// void setup() {
-//   // Serial.begin(115200);
-//   // delay(2000);                               // give time for serial to start
-//   // Serial.setDebugOutput(true);
-//   // Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
-//   // Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-//   // Serial.println("\n\n\n");                      // line feeds
-//   // Serial.println("-----------------------------------");
-//   // Serial.printf("Starting - %s - %s \n", stitle, sversion);
-//   // Serial.println("-----------------------------------");
-//   // Serial.println("Init WiFi...");
-//   // WiFi.begin("Netzwerg", "ST04ra04");
-//   // while (WiFi.status() != WL_CONNECTED) {
-//   //   delay(500);
-//   //   Serial.print(".");
-//   // }
-//   // Serial.print("\nWiFi connected, ");
-//   // Serial.print("IP address: ");
-//   // Serial.println(WiFi.localIP());  
-
-//  if (serialDebug) {
-//    Serial.begin(serialSpeed);                     // Start serial communication
-//    delay(2000);                               // give time for serial to start
-
-//    Serial.setDebugOutput(true);
-
-//    Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
-//    Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-
-//    Serial.println("\n\n\n");                      // line feeds
-//    Serial.println("-----------------------------------");
-//    Serial.printf("Starting - %s - %s \n", stitle, sversion);
-//    Serial.println("-----------------------------------");
-//  }
-
-// //  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
-
-//  // small indicator led on rear of esp32cam board
-// //  #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
-// //    pinMode(LED_GPIO_NUM, OUTPUT);
-// //    digitalWrite(LED_GPIO_NUM,HIGH);
-// //    // small indicator led on   
-// //    digitalWrite(LED_GPIO_NUM,LOW);  
- 
-             
-//   // #endif
-//   // Connect to wifi
-//   if (serialDebug) {
-//     Serial.print("\nConnecting to ");
-//     Serial.print(SSID_NAME);
-//     Serial.print("\n   ");
-//   }
-
-//   // Check if SSID_NAME is set
-//   if (SSID_NAME == nullptr) {
-//     if (serialDebug) {
-//       Serial.println("Error: SSID_NAME not set!");
-//     }
-//     while(1); // Stop
-//   } // Check if SSID_NAME is set
-
-//   // Check if SSID_PASWORD is set
-//   if (SSID_PASWORD == nullptr) {
-//     if (serialDebug) {
-//       Serial.println("Error: SSID_PASWORD not set!");
-//     }
-//     while(1); // Stop
-//   } // Check if SSID_PASWORD is set
-
-//   // Start WiFi connection
-//   WiFi.begin(SSID_NAME, SSID_PASWORD);
-//   while (WiFi.status() != WL_CONNECTED) {
-//       delay(500);
-//       if (serialDebug) {
-//         Serial.print(".");
-//       } // Print dot while connecting
-//   }
-
-//   // WiFi connected
-//   if (serialDebug) {
-//     Serial.print("\nWiFi connected, ");
-//     Serial.print("IP address: ");
-//     Serial.println(WiFi.localIP());
-//   }
-
-//   server.enableCORS();   // allow html to request pages without it being blocked
-//   server.begin();        // start web server
-
-//   // define the web pages (i.e. call these procedures when url is requested)
-//   server.on("/", handleRoot);                   // root page
-//   server.on("/data", handleData);               // suplies data to periodically update root (AJAX)
-//   server.on("/jpg", handleJPG);                 // capture image and send as jpg
-//   server.on("/jpeg", handleJpeg);                // show updating image
-//   server.on("/stream", handleStream);           // stream live video
-//   server.on("/photo", handlePhoto);             // save image to sd card
-//   server.on("/img", handleImg);                 // show image from sd card
-//   server.on("/rgb", readRGBImage);              // demo converting image to RGB
-//   server.on("/graydata", readGrayscaleImage);   // look at grayscale image data
-//   server.on("/test", handleTest);               // Testing procedure
-//   server.on("/reboot", handleReboot);           // restart device
-//   server.on("/ping", handlePing);               // for checking camera is responding
-//   server.on("/switch", handleSwitch);           // switch gpio pin via a url
-//   server.onNotFound(handleNotFound);            // invalid url requested
-// #if ENABLE_OTA   
-//   server.on("/ota", handleOTA);                 // ota updates web page
-// #endif
-
-// // NTP - internet time
-//   if (serialDebug) Serial.println("\nGetting real time (NTP)");
-//   configTime(0, 0, ntpServer);
-//   setenv("TZ", TZ_INFO, 1);
-//   if (getNTPtime(10)) {  // wait up to 10 sec to sync
-//   } else {
-//     if (serialDebug) Serial.println("Time not set");
-//   }
-//   lastNTPtime = time(&now);
-
-// // set up camera
-//     if (serialDebug) Serial.print(("\nInitialising camera: "));
-//     if (initialiseCamera(1)) {           // apply settings from 'config' and start camera
-//       if (serialDebug) Serial.println("OK");
-//     }
-//     else {
-//       if (serialDebug) Serial.println("failed");
-//     }
-
-// // Spiffs - for storing images without an sd card
-// //       see: https://circuits4you.com/2018/01/31/example-of-esp8266-flash-file-system-spiffs/
-//   if (!SPIFFS.begin(true)) {
-//     if (serialDebug) Serial.println(("An Error has occurred while mounting SPIFFS - restarting"));
-//     delay(5000);
-//     ESP.restart();                               // restart and try again
-//     delay(5000);
-//   } else {
-//     // SPIFFS.format();      // wipe spiffs
-//     delay(5000);
-//     if (serialDebug) {
-//       Serial.print(("SPIFFS mounted successfully: "));
-//       Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
-//     }
-//   }
-
-//   //print heap
-//   if (serialDebug) {
-//     Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
-//     Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-//   }
-
-//   if (serialDebug) {
-//     Serial.println("No SD Card detected");
-//   }
-//   sdcardPresent = 0;           // flag no sd card available
-
-//   fs::FS &fs = SD_MMC;                        // sd card file system
-
-//   // discover the number of image files already stored in '/img' folder of the sd card and set image file counter accordingly
-//   imageCounter = 0;
-
-//   // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
-// #if defined ESP32
-//   esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
-//   #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
-//     // v3 board manager detected
-//       if (serialDebug) Serial.println("Watchdog timer: v3 esp32 board manager detected");
-//       esp_task_wdt_config_t wdt_config = {
-//           .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
-//           .idle_core_mask = 1 << 0,         // Which core to monitor
-//           .trigger_panic = true             // Enable panic
-//       };
-//     // Initialize the WDT with the configuration structure
-//       esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
-//       esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
-//       esp_task_wdt_reset();                 // reset timer
-//       if (serialDebug) Serial.println("Watchdog Timer initialized");
-//   #else
-//     // pre v3 board manager assumed
-//       if (serialDebug) Serial.println("Watchdog timer: Older esp32 board manager detected");
-//       esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
-//       esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
-//   #endif
-// #endif  
-
-//   //print heap
-//   if (serialDebug) {
-//     Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
-//     Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-//   }
-
-//  // startup complete
-//    if (serialDebug) Serial.println("\nStarted...");
-
-// }
-
-
-
-
-
-// ******************************************************************************************************************
-// ----------------------------------------------------------------
-//   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
-// ----------------------------------------------------------------
-// void loop() {
-//   // Serial.println("Looping...");
-//   server.handleClient();          // handle any incoming web page requests
-
-
-
-// // reset the watchdog timer to prevent system restart
-//   if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) {
-//     lastStatus = millis();                                               // reset timer
-//     Serial.println("Resetting watchdog timer..."); // Debug message
-//     esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
-// // #if !defined(ESP32CAMFREENOVE_S3) && !defined(ESP32CAMFREENOVE)
-// //     if (flashIndicatorLED) digitalWrite(LED_GPIO_NUM,!digitalRead(LED_GPIO_NUM));     // flip indicator led status
-// // #endif
-//   }
-
-//   //print heap
-//   // if (serialDebug) {
-//   //   Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
-//   //   Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
-//   // }
-
-// }
-
-
-
-// ********************************************************************************************************************************************
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2565,7 +2419,7 @@ void handleTest() {
 
 }  // handleTest
 
-// #if defined(ESP32CAMFREENOVE_S3)
+#if defined(ESP32CAMFREENOVE_S3) || defined(ESP32CAMCHINESESELLER)
 // // Hilfsfunktion: LEDs nacheinander in einer bestimmten Farbe einschalten
 // // Die Adafruit Bibliothek verwendet strip.Color(R, G, B)
 // void colorWipe(uint32_t color, int wait) {
@@ -2576,30 +2430,31 @@ void handleTest() {
 //   }
 // }
 
-// // Hilfsfunktion: Regenbogen-Effekt
-// // Diese Funktion verwendet die ColorHSV-Funktion der Adafruit Bibliothek
-// void updateRainbow() {
-//   unsigned long currentMillis = millis();
+// Hilfsfunktion: Regenbogen-Effekt
+// Diese Funktion verwendet die ColorHSV-Funktion der Adafruit Bibliothek
+void updateRainbow() {
+  unsigned long currentMillis = millis();
 
-//   // Prüfe, ob es Zeit ist, den Regenbogen-Effekt zu aktualisieren
-//   if (currentMillis - previousMillisRainbow >= rainbowInterval) {
-//     previousMillisRainbow = currentMillis; // Speichere die letzte Aktualisierungszeit
+  // Prüfe, ob es Zeit ist, den Regenbogen-Effekt zu aktualisieren
+  if (currentMillis - previousMillisRainbow >= rainbowInterval) {
+    previousMillisRainbow = currentMillis; // Speichere die letzte Aktualisierungszeit
 
-//     // Aktualisiere alle Pixel für den aktuellen Farbton
-//     for(int i=0; i<strip.numPixels(); i++) { // Für jede LED in der Kette
-//       int pixelHue = currentRainbowHue + (i * 65536L / strip.numPixels());
-//       strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
-//     }
-//     strip.show(); // Aktualisiere die LED-Leiste
+    // Aktualisiere alle Pixel für den aktuellen Farbton
+    for(int i=0; i<strip.numPixels(); i++) { // Für jede LED in der Kette
+      int pixelHue = currentRainbowHue + (i * 65536L / strip.numPixels());
+      strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
+    }
+    strip.show(); // Aktualisiere die LED-Leiste
 
-//     // Erhöhe den Farbton für die nächste Aktualisierung
-//     currentRainbowHue += 256; // Gleicher Schritt wie in der ursprünglichen Schleife
-//     if (currentRainbowHue >= 5 * 65536) { // Setze zurück, wenn 5 volle Zyklen erreicht sind
-//       currentRainbowHue = 0;
-//     }
-//   }
-// }
-// #endif // defined(ESP32CAMFREENOVE_S3)
+    // Erhöhe den Farbton für die nächste Aktualisierung
+    currentRainbowHue += 256; // Gleicher Schritt wie in der ursprünglichen Schleife
+    if (currentRainbowHue >= 5 * 65536) { // Setze zurück, wenn 5 volle Zyklen erreicht sind
+      Serial.println("Rainbow cycle complete, resetting hue!");
+      currentRainbowHue = 0;
+    }
+  }
+}
+#endif // defined(ESP32CAMFREENOVE_S3)
 
 
 
